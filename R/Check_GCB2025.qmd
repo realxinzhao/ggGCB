@@ -277,6 +277,12 @@ lapply(c("BLUE", "OSCAR", "H&C2023", "LUCE"),
   gather(GCB_reg, value, -year) %>% mutate(BKM = BKM)
 }) %>% bind_rows() -> GCB_BKM_Eluc
 
+GCB_BKM_Eluc %>% 
+  group_by_at(vars(-value, -BKM)) %>% 
+  summarize(value = mean(value), .groups = "drop") %>% 
+  mutate(BKM = "GCB") %>% 
+  bind_rows(GCB_BKM_Eluc) ->
+  GCB_BKM_Eluc
 
 GCB_BKM_Eluc %>% filter(year >= 1980) %>% 
   left_join(Mapping_GCB_GCAM_Reg, by = "GCB_reg") %>% 
