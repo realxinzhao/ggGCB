@@ -16,11 +16,13 @@ editor: visual
 
 The *Global Carbon Budget* (GCB) is the flagship report and dataset updated annually to monitor, estimate, and account for carbon emissions. With the release of [GCB 2024](https://essd.copernicus.org/articles/17/965/2025) in March 2025, we take this opportunity to briefly explore the data from a GCAM modeler’s perspective.
 
-We will focus in particular on net land-use change emissions (E~LUC~)—an emission category (source) that GCAM can report (namely anthropogenic land use change emissions or LULUCF/AFOLU CO~2~ emissions), though with substantial uncertainty and potential discrepancies in definition. In this release, GCB introduced a new bookkeeping model, LUCE[^1], for estimating E~LUC~, alongside the original three: BLUE, H&C2023, and OSCAR[^2] (see Table 4 in GCB 2024). For the main E~LUC~ categories—(1) **deforestation**, (2) **forest regrowth**, (3) **other transitions**, and (4) **wood harvest & other forest management**—GCB uses the average of the four bookkeeping models as its default estimate. However, for the fifth category, (5) **peat drainage and peat fires**, all models rely on external estimates, specifically the mean of values from FAO, LPX-Bern, and ORCHIDEE.
+We will focus in particular on net land-use change emissions (E~LUC~)—an emission category (source) that GCAM can report (namely anthropogenic land use change emissions or LULUCF/AFOLU CO~2~ emissions), though with substantial uncertainty and potential discrepancies in definition. In this release, GCB introduced a new bookkeeping model, LUCE[^1], for estimating E~LUC~, alongside the original three: BLUE, H&C2023[^2], and OSCAR[^3] (see Table 4 in GCB 2024). For the main E~LUC~ categories—(1) **deforestation**, (2) **forest regrowth**, (3) **other transitions**, and (4) **wood harvest & other forest management**—GCB uses the average of the four bookkeeping models as its default estimate. However, for the fifth category, (5) **peat drainage and peat fires**, all models rely on external estimates, specifically the mean of values from FAO, LPX-Bern, and ORCHIDEE.
 
-[^1]: Xin indeed interacted with the lead author Zhangcai Qin \~10 years ago when he was in Argonne and contributed to the CCLUB model. Min Chen is also a coauthor in their recent paper
+[^1]: Xin interacted with the lead author Zhangcai Qin \~10 years ago when he was in Argonne and contributed to the CCLUB model. Min Chen is also a coauthor in their recent paper
 
-[^2]: Matthew Gidden, now with JGCRI, is an expert.
+[^2]: GCAM used Houghton (\~2000) data previously, but have recently changed to SoilGrid and other sources.
+
+[^3]: Matthew Gidden, now with JGCRI, is an expert.
 
 From a technical perspective, GCAM also incorporates a bookkeeping-style approach for estimating ELUC based on land use change results in GCAM. However, it operates at a coarse spatial resolution and lacks, or has only limited, representation of key processes such as land transitions, forest management, and peatland drainage and fires. Here, we briefly compare E~LUC~ estimates from the GCB bookkeeping models with GCAM results for recent years, focusing on the period around 2021—the new base year for GCAM.
 
@@ -29,7 +31,7 @@ From a technical perspective, GCAM also incorporates a bookkeeping-style approac
 ::: callout-note
 ### Diffs in bookkeeping models?
 
-Bookkeeping models can differ significantly in terms of spatial resolution, input data, and underlying assumptions. For example, Houghton's model uses FAO national-level land-use data, whereas others rely on LUH2 (Land-Use Harmonization 2), developed by George Hurtt’s group at the University of Maryland. As noted in [H&C (2023)](https://doi.org/10.5194/essd-15-2025-2023), LUH2 itself draws on land-use change data from the FAO and version 3.3 of the History Database of the Global Environment (HYDE; maintained by [Goldewijk et al.](https://doi.org/10.5194/essd-9-927-2017), PBL).
+Bookkeeping models can differ significantly in terms of spatial resolution, input data, processes represented, and underlying assumptions (see Section S2.1 in GCB2025). For example, ***HC2023*** uses FAO national-level land-use data, whereas others (***OSCAR*** also has a computational unit at the country level?) mainly rely on LUH2 developed by George Hurtt’s group (UMD). As noted in [H&C (2023)](https://doi.org/10.5194/essd-15-2025-2023), LUH2 itself draws on land-use change data from the FAO and version 3.3 of the History Database of the Global Environment (HYDE; maintained by [Goldewijk et al.](https://doi.org/10.5194/essd-9-927-2017), PBL).
 :::
 
 ## GCB 2024 data
@@ -89,7 +91,9 @@ Eluc_world %>% mutate(value = Net * 44 / 12) %>%
 
 ```
 
--   H & C (2023) is systematically lower than others, but annual variations are fairly consistent across models.
+-   The GCB estimate is the simple average of the four models. Adding ***LUCE*** raised the overall ELUC estimate, as the relative weight of ***HC2023***—the model with the lowest emissions—was reduced. However, the mean still remains lower than the estimates from the other three models in most years.
+
+-   ***HC 2023*** is systematically lower than others, but annual variations are fairly consistent across models.
 
 ```{r, message=F, warning=F}
 #| fig-width: 8
@@ -144,16 +148,17 @@ Eluc_world %>%
   kbl(format = 'html',
       caption = "Table: Cumulative Eluc emissions by component and model (1959–2023, in GtCO₂)") %>% 
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
-
 ```
 
 -   **Cumulatively, diff could be very large (see the table below)!**
 
-The GCB provides country-level results, but without component-level detail. We will explore those components later using GCAM results. It could be useful to get those more detailed results along with the land use change results at the country levels later for additional examination.
-
-## Add GCAM
-
 ------------------------------------------------------------------------
+
+## GCAM vs. GCB for Eluc
+
+The decomposition of E~LUC~ components is provided by the GCB only at the global level, not in the country-level data. This detailed breakdown is valuable, especially since GCAM does not include peat-related emissions—an element that is accounted for separately in the GCB models. Here, we first compare global results and examine the role of peat-related emissions in the overall accounting. We then move on to compare regional results based on net total emissions. Obtaining more detailed, component-level data alongside country-level land-use change estimates in the future would be helpful for further analysis.
+
+### Global comparison
 
 ```{r, message=F, warning=F}
 
@@ -210,7 +215,7 @@ ggplotly(p)
 
 -   GCAM results appear at the low end compared to GCB models (except for 2015). It is important to note that GCAM does not (explicitly) include peat related emissions.
 
-### Check again after removing peat related emissions in GCB
+#### Check again after removing peat related emissions in GCB
 
 ```{r, message=F, warning=F}
 
@@ -251,6 +256,134 @@ df %>% filter(year >= 1980) %>%
 ggplotly(p)
 ```
 
-## Regional comparison
+### Regional comparison
 
-Specifically, we will create a region mapping between GCB countries and GCAM 32 regions to aggregate GCB data into GCAM regions.
+We first create a region mapping between GCB countries and GCAM 32 regions to aggregate GCB data into GCAM regions.
+
+Load regional data
+
+```{r, message=F, warning=F}
+#| fig-width: 8
+#| fig-height: 13
+
+readr::read_csv("../data/common/iso_GCAM_regID.csv", comment = "#") -> iso_GCAM_regID
+readr::read_csv("../data/common/GCAM_region_names.csv", comment = "#") -> GCAM_region_names
+readr::read_csv("../data/GCB/Mapping_GCB_GCAM_Reg.csv", comment = "#") -> Mapping_GCB_GCAM_Reg
+
+lapply(c("BLUE", "OSCAR", "H&C2023", "LUCE"), 
+       function(BKM){
+
+  readxl::read_excel("../data/GCB/National_LandUseChange_Carbon_Emissions_2024v1.01.xlsx", sheet = BKM, skip = 7) %>% rename(year = `unit: Tg C/year`) %>% 
+  gather(GCB_reg, value, -year) %>% mutate(BKM = BKM)
+}) %>% bind_rows() -> GCB_BKM_Eluc
+
+
+GCB_BKM_Eluc %>% filter(year >= 1980) %>% 
+  left_join(Mapping_GCB_GCAM_Reg, by = "GCB_reg") %>% 
+  mutate(iso = if_else(GCB_reg == "Côte d'Ivoire", "civ", iso),
+         iso = if_else(GCB_reg == "Türkiye", "tur", iso)) %>%
+  filter(!is.na(iso)) %>% 
+  left_join(iso_GCAM_regID %>% select(iso, GCAM_region_ID), by = "iso") %>% 
+  left_join(GCAM_region_names, by = "GCAM_region_ID") %>% 
+  group_by(region, model = BKM, year) %>% 
+  summarize(value = sum(value) * 44/12/1000, .groups = "drop") ->
+  GCB_BKM_Eluc_agg
+
+
+
+GCAM_Eluc %>% 
+  filter(year <= 2025) %>% 
+  mutate(model = "GCAM") %>% 
+  bind_rows(
+    GCB_BKM_Eluc_agg 
+  ) -> df
+
+df %>% filter(region %in% c("China", "Brazil", "Africa_Western", 
+                            "Indonesia")) -> 
+  df1
+
+df1 %>% 
+  filter(!(model == "GCAM" & !year %in% c(seq(1980, 2015, 5), 2021, 2025))) %>% 
+  mutate(model = factor(model,
+                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE", "GCB", "GCAM"),
+                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB","GCAM"))) %>% 
+  ggplot() + facet_wrap(~region, scale = "free", ncol = 1) +
+  geom_vline(xintercept = 2021, size = 0.5) +
+  geom_vline(xintercept = 2015, size = 0.5) +
+  geom_line(aes(x = year, y = value, color = model, linetype = model),
+            size = .7) +
+  geom_point(data = df1 %>% 
+               filter(model == "GCAM", 
+                      year %in% c(seq(1980, 2015, 5), 2021, 2025)),
+             aes(x = year, y = value), color = "red", fill = "black", size = 1, shape = 21) +
+  geom_hline(yintercept = 0) +
+  scale_color_brewer(palette = "Set1") +
+  scale_linetype_manual(values = c(rep(1, 4), 5, 1)) +
+  theme_bw() + 
+  labs(x = "Year", y = "GtCO2", color = "Model", linetype = "Model",
+       caption = "Data source: GCB 2024",
+       title = "GCB: region Eluc vs. GCAM",
+       subtitle = "GCAM base years in red dots") -> p
+ggplotly(p)
+
+
+
+
+
+df %>% filter(region %in% c("USA", "China", "Brazil", "Africa_Western", 
+                            "Indonesia", "Southeast Asia", "EU-12", "EU-15")) -> 
+  df1
+
+df1 %>% 
+  filter(!(model == "GCAM" & !year %in% c(seq(1980, 2015, 5), 2021, 2025))) %>% 
+  mutate(model = factor(model,
+                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE","GCB", "GCAM"),
+                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB","GCAM"))) %>% 
+  ggplot() + facet_wrap(~region, scale = "free_y", ncol = 2) +
+  geom_vline(xintercept = 2021, size = 0.5) +
+  geom_vline(xintercept = 2015, size = 0.5) +
+  geom_line(aes(x = year, y = value, color = model, linetype = model),
+            size = .7) +
+  geom_point(data = df1 %>% 
+               filter(model == "GCAM", 
+                      year %in% c(seq(1980, 2015, 5), 2021, 2025)),
+             aes(x = year, y = value), color = "red", fill = "black", size = 1, shape = 21) +
+  geom_hline(yintercept = 0) +
+  scale_color_brewer(palette = "Set1") +
+  scale_linetype_manual(values = c(rep(1, 4), 5, 1)) +
+  theme_bw() + 
+  labs(x = "Year", y = "GtCO2", color = "Model", linetype = "Model",
+       caption = "Data source: GCB 2024",
+       title = "GCB: region Eluc vs. GCAM",
+       subtitle = "GCAM base years in red dots")
+
+
+
+df %>% filter(!region %in% c("USA", "China", "Brazil", "Africa_Western", 
+                            "Indonesia", "Southeast Asia", "EU-12", "EU-15")) -> 
+  df1
+
+df1 %>% 
+  filter(!(model == "GCAM" & !year %in% c(seq(1980, 2015, 5), 2021, 2025))) %>% 
+  mutate(model = factor(model,
+                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE","GCB", "GCAM"),
+                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB","GCAM"))) %>% 
+  ggplot() + facet_wrap(~region, scale = "free_y", ncol = 4) +
+  geom_vline(xintercept = 2021, size = 0.5) +
+  geom_vline(xintercept = 2015, size = 0.5) +
+  geom_line(aes(x = year, y = value, color = model, linetype = model),
+            size = .7) +
+  geom_point(data = df1 %>% 
+               filter(model == "GCAM", 
+                      year %in% c(seq(1980, 2015, 5), 2021, 2025)),
+             aes(x = year, y = value), color = "red", fill = "black", size = 1, shape = 21) +
+  geom_hline(yintercept = 0) +
+  scale_color_brewer(palette = "Set1") +
+  scale_linetype_manual(values = c(rep(1, 4), 5, 1)) +
+  theme_bw() + 
+  labs(x = "Year", y = "GtCO2", color = "Model", linetype = "Model",
+       caption = "Data source: GCB 2024",
+       title = "GCB: region Eluc vs. GCAM",
+       subtitle = "GCAM base years in red dots")
+
+```
