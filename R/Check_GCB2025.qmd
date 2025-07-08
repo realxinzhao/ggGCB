@@ -150,54 +150,61 @@ Eluc_world %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
 ```
 
--   **Cumulatively, diff could be very large (see the table below)!**
+-   **Cumulatively, diff could be very large (see the table above)!**
 
 ------------------------------------------------------------------------
 
 ## GCAM vs. GCB for Eluc
 
-The decomposition of E~LUC~ components is provided by the GCB only at the global level, not in the country-level data. This detailed breakdown is valuable, especially since GCAM does not include peat-related emissions—an element that is accounted for separately in the GCB models. Here, we first compare global results and examine the role of peat-related emissions in the overall accounting. We then move on to compare regional results based on net total emissions. Obtaining more detailed, component-level data alongside country-level land-use change estimates in the future would be helpful for further analysis.
+The decomposition of E~LUC~ components is provided by the GCB only at the global level, not at the country-level data. This detailed breakdown is valuable, especially since GCAM does not include peat-related emissions—an element that is accounted for separately in the GCB models. Here, we first compare global results and examine the role of peat-related emissions in the overall accounting. We then move on to compare regional results based on net total emissions. Obtaining more detailed, component-level data alongside country-level land-use change estimates in the future would be helpful for further analysis.
 
 ### Global comparison
 
 ```{r, message=F, warning=F}
 
-readr::read_csv("../data/GCB/GCAM_BYU_LULUCF.csv", comment = "#") ->
+readr::read_csv("../data/GCB/GCAM_BYU_LULUCF_ScenMIP.csv", comment = "#") %>% 
+      mutate(model = "h3_250706a") %>% gcamdata::gather_years()->
   GCAM_Eluc
 
 GCAM_Eluc %>% 
-  gcamdata::gather_years() %>% 
-  transmute(region, year, value = value * 44/12/1000) ->
+  filter(model == "h3_250706a") %>% 
+  filter(year %in% c(seq(1980, 2020, 5), 2021, 2025, seq(2030, 2100, 5))) %>% 
+  transmute(model, region, year, value = value * 44/12/1000) ->
+  GCAM_Eluc
+
+# adding a scenario removing near-term emissions
+GCAM_Eluc %>% 
+  filter(!year %in% c(2019:2025)) %>% 
+  mutate(model = "h3_250706a_fix") %>% 
+  bind_rows(
+    GCAM_Eluc
+  ) -> 
   GCAM_Eluc
 
 GCAM_Eluc %>% 
-  group_by(year) %>% filter(year <= 2025) %>% 
+  group_by(model, year) %>%
   summarize(value = sum(value), .groups = "drop") %>% 
-  mutate(model = "GCAM") %>% 
   bind_rows(
     Eluc_world %>% 
       transmute(year, model, value = Net * 44 / 12)
   ) -> df
 
 df %>% mutate(model = factor(model,
-              levels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB", "GCAM"))) ->
+              levels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB", "h3_250706a", "h3_250706a_fix"))) ->
   df
 
-df %>% filter(!(model == "GCAM" & !year %in% c(seq(1980, 2015, 5), 2021, 2025))) %>% 
+df %>% filter(year >= 1990) %>% 
   ggplot() +
   geom_vline(xintercept = 2021, size = 0.5) +
   geom_vline(xintercept = 2015, size = 0.5) +
-  geom_line(aes(x = year, y = value, color = model, linetype = model),
+  geom_line(aes(x = year, y = value, color = model, linetype = model, size = model),
             size = .7) +
-  geom_point(data = df %>% filter(model == "GCAM"),
-             aes(x = year, y = value), color = "black", size = 0.6) +
-    geom_point(data = df %>% 
-                 filter(model == "GCAM", 
-                        year %in% c(seq(1980, 2015, 5), 2021, 2025)),
-             aes(x = year, y = value), color = "red", size = 1, shape = 21) +
+  geom_point(data = df %>% filter(grepl("h3", model)), 
+             aes(x = year, y = value), fill = "red", color = "black", size = 1, shape = 21) +
   geom_hline(yintercept = 0) +
   scale_color_brewer(palette = "Set1") +
-  scale_linetype_manual(values = c(rep(1, 4), 5, 1)) +
+  scale_linetype_manual(values = c(rep(2, 4), 1, 1, 5)) +
+  scale_size_manual(values = c(rep(0.4, 4), 1, 1.5, 1)) +
   theme_bw() + 
   labs(x = "Year", y = "GtCO2", color = "Model", linetype = "Model",
        caption = "Data source: GCB 2024",
@@ -209,9 +216,11 @@ ggplotly(p)
 
 ```
 
--   GCAM can report annual E~LUC~ (black dots), but it is not clear about the methods there. We usually use linear interpolation though (yellow line).
+-   GCAM can directly report annual E~LUC~, but it is not clear about the methods there. We usually use linear interpolation though.
 
--   The GCAM results presented here are very preliminary (1st round under review). There are known issues that have not yet been resolved—for example, the large area of managed forest conversion in recent years, which stems from assumptions about carbon density (a long and complex story).
+-   The GCAM results used here are from a recent database generated for **ScenarioMIP (h3)**. We added a scenario to simply remove those near-term years with dips.
+
+-   There were known issues that have been resolved here (but not in core yet)—for example, the large area of managed forest conversion in recent years, which stems from assumptions about carbon density (a long and complex story).
 
 -   GCAM results appear at the low end compared to GCB models (except for 2015). It is important to note that GCAM does not (explicitly) include peat related emissions.
 
@@ -220,33 +229,30 @@ ggplotly(p)
 ```{r, message=F, warning=F}
 
 GCAM_Eluc %>% 
-  group_by(year) %>% filter(year <= 2025) %>% 
+  group_by(model, year) %>%
   summarize(value = sum(value), .groups = "drop") %>% 
-  mutate(model = "GCAM") %>% 
   bind_rows(
     Eluc_world %>% 
       transmute(year, model, value = (Net - `peat drainage & peat fires`) * 44 / 12)
   ) -> df
 
 
-df %>% filter(year >= 1980) %>% 
-  filter(!(model == "GCAM" & !year %in% c(seq(1980, 2015, 5), 2021, 2025))) %>% 
-  mutate(model = factor(model,
-              levels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB", "GCAM"))) %>% 
+df %>% mutate(model = factor(model,
+              levels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB", "h3_250706a", "h3_250706a_fix"))) ->
+  df
+
+df %>%  filter(year >= 1990) %>% 
   ggplot() +
   geom_vline(xintercept = 2021, size = 0.5) +
   geom_vline(xintercept = 2015, size = 0.5) +
-  geom_line(aes(x = year, y = value, color = model, linetype = model),
+  geom_line(aes(x = year, y = value, color = model, linetype = model, size = model),
             size = .7) +
-  geom_point(data = df %>% filter(model == "GCAM"),
-             aes(x = year, y = value), color = "black", size = 0.6) +
-    geom_point(data = df %>% 
-                 filter(model == "GCAM", 
-                        year %in% c(seq(1980, 2015, 5), 2021, 2025)),
-             aes(x = year, y = value), color = "red", size = 1, shape = 21) +
+  geom_point(data = df %>% filter(grepl("h3", model)), 
+             aes(x = year, y = value), fill = "red", color = "black", size = 1, shape = 21) +
   geom_hline(yintercept = 0) +
   scale_color_brewer(palette = "Set1") +
-  scale_linetype_manual(values = c(rep(1, 4), 5, 1)) +
+  scale_linetype_manual(values = c(rep(2, 4), 1, 1, 5)) +
+  scale_size_manual(values = c(rep(0.4, 4), 1, 1.5, 1)) +
   theme_bw() + 
   labs(x = "Year", y = "GtCO2", color = "Model", linetype = "Model",
        caption = "Data source: GCB 2024",
@@ -284,7 +290,8 @@ GCB_BKM_Eluc %>%
   bind_rows(GCB_BKM_Eluc) ->
   GCB_BKM_Eluc
 
-GCB_BKM_Eluc %>% filter(year >= 1980) %>% 
+GCB_BKM_Eluc %>% 
+  filter(year >= 1990) %>% 
   left_join(Mapping_GCB_GCAM_Reg, by = "GCB_reg") %>% 
   mutate(iso = if_else(GCB_reg == "Côte d'Ivoire", "civ", iso),
          iso = if_else(GCB_reg == "Türkiye", "tur", iso)) %>%
@@ -298,8 +305,7 @@ GCB_BKM_Eluc %>% filter(year >= 1980) %>%
 
 
 GCAM_Eluc %>% 
-  filter(year <= 2025) %>% 
-  mutate(model = "GCAM") %>% 
+  #filter(year <= 2025) %>% 
   bind_rows(
     GCB_BKM_Eluc_agg 
   ) -> df
@@ -309,22 +315,19 @@ df %>% filter(region %in% c("China", "Brazil", "Africa_Western",
   df1
 
 df1 %>% 
-  filter(!(model == "GCAM" & !year %in% c(seq(1980, 2015, 5), 2021, 2025))) %>% 
   mutate(model = factor(model,
-                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE", "GCB", "GCAM"),
-                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB","GCAM"))) %>% 
+                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE", "GCB", "h3_250706a", "h3_250706a_fix"),
+                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB", "h3_250706a", "h3_250706a_fix"))) %>% 
   ggplot() + facet_wrap(~region, scale = "free", ncol = 1) +
   geom_vline(xintercept = 2021, size = 0.5) +
   geom_vline(xintercept = 2015, size = 0.5) +
   geom_line(aes(x = year, y = value, color = model, linetype = model),
             size = .7) +
-  geom_point(data = df1 %>% 
-               filter(model == "GCAM", 
-                      year %in% c(seq(1980, 2015, 5), 2021, 2025)),
+  geom_point(data = df1 %>% filter(grepl("h3", model)), 
              aes(x = year, y = value), color = "red", fill = "black", size = 1, shape = 21) +
   geom_hline(yintercept = 0) +
   scale_color_brewer(palette = "Set1") +
-  scale_linetype_manual(values = c(rep(1, 4), 5, 1)) +
+  scale_linetype_manual(values = c(rep(1, 4), 5, 1, 1)) +
   theme_bw() + 
   labs(x = "Year", y = "GtCO2", color = "Model", linetype = "Model",
        caption = "Data source: GCB 2024",
@@ -341,27 +344,24 @@ df %>% filter(region %in% c("USA", "China", "Brazil", "Africa_Western",
   df1
 
 df1 %>% 
-  filter(!(model == "GCAM" & !year %in% c(seq(1980, 2015, 5), 2021, 2025))) %>% 
   mutate(model = factor(model,
-                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE","GCB", "GCAM"),
-                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB","GCAM"))) %>% 
-  ggplot() + facet_wrap(~region, scale = "free_y", ncol = 2) +
+                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE", "GCB", "h3_250706a", "h3_250706a_fix"),
+                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB","h3_250706a", "h3_250706a_fix"))) %>% 
+  ggplot() + facet_wrap(~region, scale = "free", ncol = 2) +
   geom_vline(xintercept = 2021, size = 0.5) +
   geom_vline(xintercept = 2015, size = 0.5) +
   geom_line(aes(x = year, y = value, color = model, linetype = model),
             size = .7) +
-  geom_point(data = df1 %>% 
-               filter(model == "GCAM", 
-                      year %in% c(seq(1980, 2015, 5), 2021, 2025)),
+  geom_point(data = df1 %>% filter(grepl("h3", model)), 
              aes(x = year, y = value), color = "red", fill = "black", size = 1, shape = 21) +
   geom_hline(yintercept = 0) +
   scale_color_brewer(palette = "Set1") +
-  scale_linetype_manual(values = c(rep(1, 4), 5, 1)) +
+  scale_linetype_manual(values = c(rep(1, 4), 5, 1, 1)) +
   theme_bw() + 
   labs(x = "Year", y = "GtCO2", color = "Model", linetype = "Model",
        caption = "Data source: GCB 2024",
        title = "GCB: region Eluc vs. GCAM",
-       subtitle = "GCAM base years in red dots")
+       subtitle = "GCAM base years in red dots") 
 
 
 
@@ -370,26 +370,23 @@ df %>% filter(!region %in% c("USA", "China", "Brazil", "Africa_Western",
   df1
 
 df1 %>% 
-  filter(!(model == "GCAM" & !year %in% c(seq(1980, 2015, 5), 2021, 2025))) %>% 
   mutate(model = factor(model,
-                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE","GCB", "GCAM"),
-                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB","GCAM"))) %>% 
-  ggplot() + facet_wrap(~region, scale = "free_y", ncol = 4) +
+                        levels = c("BLUE", "H&C2023", "OSCAR", "LUCE", "GCB", "h3_250706a", "h3_250706a_fix"),
+                        labels = c("BLUE", "HC2023", "OSCAR", "LUCE", "GCB","h3_250706a", "h3_250706a_fix"))) %>% 
+  ggplot() + facet_wrap(~region, scale = "free", ncol = 4) +
   geom_vline(xintercept = 2021, size = 0.5) +
   geom_vline(xintercept = 2015, size = 0.5) +
   geom_line(aes(x = year, y = value, color = model, linetype = model),
             size = .7) +
-  geom_point(data = df1 %>% 
-               filter(model == "GCAM", 
-                      year %in% c(seq(1980, 2015, 5), 2021, 2025)),
+  geom_point(data = df1 %>% filter(grepl("h3", model)), 
              aes(x = year, y = value), color = "red", fill = "black", size = 1, shape = 21) +
   geom_hline(yintercept = 0) +
   scale_color_brewer(palette = "Set1") +
-  scale_linetype_manual(values = c(rep(1, 4), 5, 1)) +
+  scale_linetype_manual(values = c(rep(1, 4), 5, 1, 1)) +
   theme_bw() + 
   labs(x = "Year", y = "GtCO2", color = "Model", linetype = "Model",
        caption = "Data source: GCB 2024",
        title = "GCB: region Eluc vs. GCAM",
-       subtitle = "GCAM base years in red dots")
+       subtitle = "GCAM base years in red dots") 
 
 ```
